@@ -6,27 +6,53 @@ using UnityEngine;
 public class Health : MonoBehaviour
 {
     private int _currentHealth;
-    private int _HealthMax;
+    private int _healthMax = 100;
+    private int timer = 0;
 
-    private Action _OnDeath;
-    private Action <int, int> _OnHealthChanges;
+    public Action OnDeath;
+    public Action <int, int> OnHealthChanges;
     private void Awake()
     {
-        _currentHealth = _HealthMax;
+        _currentHealth = _healthMax;
+        
     }
 
-    private void Change(int value)
+    private void Change()
     {
-        _currentHealth += value;
-        if (_currentHealth > _HealthMax)
+        _currentHealth -= AI.value;
+        if (timer == 2)
         {
-            _currentHealth = _HealthMax;
+            StartCoroutine(Wait());
+        }
+        if (_currentHealth > _healthMax)
+        {
+            _currentHealth = _healthMax;
         }
         if (_currentHealth <= 0)
         {
-            _OnDeath?.Invoke();
+            OnDeath?.Invoke();
         }
-        _OnHealthChanges?.Invoke(_currentHealth, _HealthMax);
+        OnHealthChanges?.Invoke(_currentHealth, _healthMax);
         //_OnDeath.Invoke;
     }
+
+    IEnumerator Wait()
+    {
+        while (true)
+        {
+            if (_currentHealth < 85)
+            {
+                Debug.Log("TimerCount: " + (timer++));
+                yield return new WaitForSeconds(1);
+            }
+
+            yield return null;
+        }
+    }
+
+    void Start()
+    {
+        StartCoroutine(Wait());
+    }
 }
+

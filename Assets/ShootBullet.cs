@@ -39,6 +39,7 @@ public class ShootController : MonoBehaviour
         // Создаём пулю
         GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
 
+
         Vector2 direction = shootRight ? Vector2.right : Vector2.left;
 
         // Поворачиваем пулю, чтоб смотрела в нужную сторону

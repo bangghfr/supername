@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
-public class HealthText : MonoBehaviour
+public class HealthBar : MonoBehaviour
 {
     [SerializeField] private TMP_Text _healthText;
 
