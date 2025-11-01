@@ -15,7 +15,7 @@ public class EnemyManager : MonoBehaviour
         {
             { EnemyType.HighestC, HighestCenemyPrefab},
             { EnemyType.MediumC, MediumCenemyPrefab},
-            { EnemyType.HighestC, DeepestCenemyPrefab},
+            { EnemyType.DeepestC, DeepestCenemyPrefab},
         });
     }
     public enum EnemyType

@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
 
@@ -11,6 +12,7 @@ public class AI : MonoBehaviour
     public float bulletSpeed = 70f;
     private bool check = false;
     public Transform Player;
+    float distance;
 
 
 
@@ -18,7 +20,7 @@ public class AI : MonoBehaviour
     {
         //Debug.Log(Enemy.transform.position.x - Player.transform.position.x <= 15);
         //Debug.Log(Enemy.transform.position.x - Player.transform.position.x >= -30);
-        float distance = Vector2.Distance(Player.position, Enemy.position);
+        distance = Vector2.Distance(Player.position, Enemy.position);
         //if (Enemy.transform.position.x > Player.transform.position.x)
         //{
         //    if (Enemy.transform.position.x - Player.transform.position.x <= 15 || Enemy.transform.position.x - Player.transform.position.x >= -30)
@@ -43,21 +45,57 @@ public class AI : MonoBehaviour
         {
             Shoot();
         }
+        if (Enemy.transform.position.x > 15 && Enemy.transform.position.x > -15)
+        {
+            Idle();
+        }    
+    }
+
+    private IEnumerator Delay()
+    {
+      
+        yield return new WaitForSeconds(1);
+    }
+
+
+    void Idle()
+    {
+        float random = Random.Range(0, 5000);
+        float SuperRandom = Random.Range(0, 10000);
+        if (distance > 7)
+        {
+            if (random < 50)
+            {
+                Enemy.transform.Rotate(0, -180, 0);
+                transform.position += new Vector3(-0.01f, 0, 0);
+            }
+            if (SuperRandom < 2)
+            {
+                Enemy.transform.Rotate(0, 0, 0);
+                transform.position += new Vector3(0.01f, 0, 0);
+            }
+        }
+
+        if (distance < 7)
+        {
+            if (random < 50)
+            {
+                Enemy.transform.Rotate(0, 0, 0);
+                transform.position += new Vector3(0.01f, 0, 0);
+            }
+            if (SuperRandom < 2)
+            {
+                Enemy.transform.Rotate(0, -180, 0);
+                transform.position += new Vector3(-0.01f, 0, 0);
+            }
+        }
     }
 
     void Shoot()
     {
         // ќпредел€ем направление стрельбы по горизонтальному движению игрока
         // ≈сли Move.x == 0 Ч можно стрел€ть вправо по умолчанию (или хранить последнее направление)
-        if (Enemy.transform.position.x > 15)
-        {
-            Enemy.transform.Rotate(0, -180, 0);
-        }
-
-        if (Enemy.transform.position.x < 15)
-        {
-            Enemy.transform.Rotate(0, 0, 0);
-        }
+      
 
         ////float horizontal = Enemy.transform.Move.x;
         bool shootLeft = Enemy.transform.position.x < 0;
@@ -111,15 +149,15 @@ public class AI : MonoBehaviour
         //    }
         //}
 
-        float distance = Vector3.Distance(Player.position, Enemy.position);
-
-        if (distance < -15)
+        if (distance < -7)
         {
             rb.AddForce(-Enemy.transform.right * bulletSpeed);
+            StartCoroutine(Delay());
         }
-        else if (distance > 15) 
+        else if (distance >7) 
         {
             rb.AddForce(Enemy.transform.right * bulletSpeed);
+            StartCoroutine(Delay());
         }
     }
 }
