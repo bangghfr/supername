@@ -154,7 +154,7 @@ public class AI : MonoBehaviour
             rb.AddForce(-Enemy.transform.right * bulletSpeed);
             StartCoroutine(Delay());
         }
-        else if (distance >7) 
+        else if (distance > 7) 
         {
             rb.AddForce(Enemy.transform.right * bulletSpeed);
             StartCoroutine(Delay());
