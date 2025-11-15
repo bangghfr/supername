@@ -6,11 +6,13 @@ public class ItemCollecter : MonoBehaviour
 {
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        
-        if (collision.gameObject.TryGetComponent<Item>(out Item item)
-            && Inventory.instance.items.Count < Inventory.instance.space )
+
+        Debug.Log(Inventory.instance.items.Count);
+        Debug.Log(Inventory.instance.space);
+        if (collision.gameObject.TryGetComponent<Collectable>(out Collectable collectable) && Inventory.instance.items.Count < Inventory.instance.space)
         {
-            Inventory.instance.Add(item);
+            Debug.Log("да");
+            Inventory.instance.Add(collectable.Item);
         }
     }
 }

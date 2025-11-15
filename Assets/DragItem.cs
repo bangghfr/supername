@@ -27,7 +27,7 @@ public class DragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
 
     void Start()
     {
-        newPosition = NewSlot.transform.position;
+        //newPosition = NewSlot.transform.position;
         goingBack = false;
         goingToNewPosition = false;
         player = GameObject.FindGameObjectWithTag("Player").transform;
