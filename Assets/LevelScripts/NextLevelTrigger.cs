@@ -1,16 +1,17 @@
-using System.Collections;
 using UnityEngine;
 
 public class NextLevelTrigger : MonoBehaviour
 {
-    public CaveGenerator2D generator;  // ссылка на генератор
-    public Transform player;
+    public CavesGenerator2D generator;
 
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player"))
         {
-            generator.GenerateNextLevel(player);
+            if (generator == null)
+                generator = FindObjectOfType<CavesGenerator2D>();
+
+            //generator.GenerateNextLevel();
         }
     }
 }
