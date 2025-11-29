@@ -20,7 +20,7 @@ public class AI : MonoBehaviour
     {
         //Debug.Log(Enemy.transform.position.x - Player.transform.position.x <= 15);
         //Debug.Log(Enemy.transform.position.x - Player.transform.position.x >= -30);
-        distance = Vector2.Distance(Player.position, Enemy.position);
+        //distance = Vector2.Distance(Player.position, Enemy.position);
         //if (Enemy.transform.position.x > Player.transform.position.x)
         //{
         //    if (Enemy.transform.position.x - Player.transform.position.x <= 15 || Enemy.transform.position.x - Player.transform.position.x >= -30)
