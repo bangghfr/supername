@@ -1,29 +1,67 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
-        private InputReceiver inputReceiver;
+    private InputReceiver inputReceiver;
+    private MoveController controller;
 
-        void Start()
+    [Header("Rope Visual")]
+    public Sprite ropeSpriteAsset;
+    private Transform ropeSprite;
+
+    void Start()
+    {
+        inputReceiver = GetComponent<InputReceiver>();
+        controller = GetComponent<MoveController>();
+
+        if (ropeSpriteAsset != null)
         {
-            inputReceiver = GetComponent<InputReceiver>();
+            GameObject rope = new GameObject("RopeSprite");
+            SpriteRenderer sr = rope.AddComponent<SpriteRenderer>();
+            sr.sprite = ropeSpriteAsset;
+            sr.sortingOrder = 50;
+            ropeSprite = rope.transform;
+            ropeSprite.gameObject.SetActive(false);
+        }
+    }
+
+    void Update()
+    {
+        HandleFlip();
+        DrawRope();
+    }
+
+    private void HandleFlip()
+    {
+        float x = inputReceiver.Move.x;
+
+        if (x > 0.01f)
+            transform.localScale = new Vector3(1, 1, 1);
+        else if (x < -0.01f)
+            transform.localScale = new Vector3(-1, 1, 1);
+    }
+
+    private void DrawRope()
+    {
+        if (ropeSprite == null) return;
+
+        if (!controller.IsHooked())
+        {
+            ropeSprite.gameObject.SetActive(false);
+            return;
         }
 
-        void Update()
-        {
-            float moveX = inputReceiver.Move.x;
+        ropeSprite.gameObject.SetActive(true);
 
-            if (moveX > 0)
-            {
-                transform.localScale = new Vector3(1, 1, 1);
-            }
-            else if (moveX < 0)
-            {
-                transform.localScale = new Vector3(-1, 1, 1);
-            }
+        Vector2 start = transform.position;
+        Vector2 end = controller.GetHookPoint();
 
-            // Остальная логика движения ...
-        }
+        ropeSprite.position = (start + end) / 2f;
+
+        Vector2 diff = end - start;
+        ropeSprite.localScale = new Vector3(diff.magnitude, 0.07f, 1f);
+
+        float angle = Mathf.Atan2(diff.y, diff.x) * Mathf.Rad2Deg;
+        ropeSprite.rotation = Quaternion.Euler(0, 0, angle);
+    }
 }

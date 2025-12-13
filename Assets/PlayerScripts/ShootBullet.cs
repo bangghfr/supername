@@ -23,7 +23,7 @@ public class ShootController : MonoBehaviour
 
     void Update()
     {
-        if (inputReceiver != null && inputReceiver.AtackPressed)
+        if (inputReceiver != null && inputReceiver.AttackPressed)
         {
             Shoot();
         }

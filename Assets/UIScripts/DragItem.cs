@@ -1,141 +1,94 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class DragItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
+    [Header("UI References")]
+    [SerializeField] private Canvas canvas;           // Канвас для UI
+    [SerializeField] private Image iconImage;         // Иконка предмета
+    [SerializeField] private InventorySlot slot;      // Слот, к которому привязан этот предмет
 
-    public static GameObject itemBeingDragged;
-    private Vector3 startPosition;
-    public GameObject a;
-    private Transform player;
+    [Header("World")]
+    [SerializeField] private Transform playerTransform; // Для выброса предмета на землю
 
+    private RectTransform rectTransform;
+    private CanvasGroup canvasGroup;
+    private Vector2 originalPosition;
 
-    public float speed;
-    public bool goingBack = false;
-    public bool goingToNewPosition = false;
-    public bool goingToNewtoNewPosition = false;
-    private Transform startParent;
-    public GameObject NewSlot;
-    private Vector3 newPosition;
-    [SerializeField] private float _lookDistance = 3f;
-    [SerializeField] private LayerMask layerMask;
-    Rigidbody2D rb;
-    [SerializeField] int _forceJump;
-    private GameObject StartSlot;
-    int chet = 1;
-
-
-    void Start()
+    private void Awake()
     {
-        //newPosition = NewSlot.transform.position;
-        goingBack = false;
-        goingToNewPosition = false;
-        player = GameObject.FindGameObjectWithTag("Player").transform;
-        rb = GetComponent<Rigidbody2D>();
+        rectTransform = GetComponent<RectTransform>();
+        canvasGroup = GetComponent<CanvasGroup>();
     }
-    private void OnMouseEnter()
-    {
-        //gameObject oldItem
-        if (gameObject.TryGetComponent<Item>(out Item item) != false)
-        {
-            if (chet == 1)
-            {
-                StartSlot = gameObject;
-            }
-            if (chet == 2)
-            {
-                NewSlot = gameObject;
-            }
-        }
-
-        }
-    void Update()
-    {
-        Vector2 direction = Vector2.right * transform.localScale.x;
-
-        Debug.DrawRay(transform.position, direction * _lookDistance, Color.red);
-
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, direction, _lookDistance, layerMask);
-        if (hit.collider != null && hit.collider.tag == "Item")
-        {
-            hit.collider.transform.position = transform.position = Vector3.Lerp(transform.position, StartSlot.transform.position, Time.deltaTime * speed);
-
-        }
-
-        PositionChanging();
-
-    }
-
-    void PositionChanging()
-    {
-
-        if (goingBack == true)
-        {
-            transform.position = Vector3.Lerp(transform.position, startPosition, Time.deltaTime * speed);
-        }
-        if (goingToNewPosition == true)
-        {
-            transform.position = Vector3.Lerp(transform.position, newPosition, Time.deltaTime * speed);
-
-        }
-        if (goingToNewPosition == true)
-        {
-
-        }
-
-    }
-
-
-
-
-    #region IBeginDragHandler implementation
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        itemBeingDragged = gameObject;
-        startPosition = transform.position;
-        startParent = transform.parent;
-        GetComponent<CanvasGroup>().blocksRaycasts = false;
+        if (slot.IsEmpty())
+            return;
+
+        originalPosition = rectTransform.anchoredPosition;
+        canvasGroup.blocksRaycasts = false;
     }
-
-    #endregion
-
-    #region IDragHandler implementation
 
     public void OnDrag(PointerEventData eventData)
     {
-        transform.position = Input.mousePosition;
+        if (slot.IsEmpty())
+            return;
+
+        rectTransform.anchoredPosition += eventData.delta / canvas.scaleFactor;
     }
-
-    #endregion
-
-    #region IEndDragHandler implementation
 
     public void OnEndDrag(PointerEventData eventData)
     {
+        canvasGroup.blocksRaycasts = true;
 
-        itemBeingDragged = null;
-        GetComponent<CanvasGroup>().blocksRaycasts = true;
-        Vector2 direction = Vector2.right * transform.localScale.x;
-        Debug.DrawRay(transform.position, direction * _lookDistance, Color.red);
-
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, direction, _lookDistance, layerMask);
-        if (hit.collider != null && hit.collider.tag == "Item")
+        if (eventData.pointerEnter != null)
         {
-            transform.position = Vector3.Lerp(transform.position, NewSlot.transform.position, Time.deltaTime * speed);
+            InventorySlot targetSlot = eventData.pointerEnter.GetComponent<InventorySlot>();
+            if (targetSlot != null)
+            {
+                SwapItems(slot, targetSlot);
+                return;
+            }
         }
 
+        // Если кликнули вне слота и нажата правая кнопка мыши — выброс предмета
+        if (Input.GetMouseButton(1))
+        {
+            DropItem(slot);
+        }
 
-        #endregion
-
-
-
+        // Вернуть предмет на место, если не поменяли
+        rectTransform.anchoredPosition = originalPosition;
     }
 
-    public void SpawnDroppedItem()
+    private void SwapItems(InventorySlot from, InventorySlot to)
     {
-        Vector2 playerPos = new Vector2(player.position.x + 1, player.position.y);
-     //   Instantiate(item, playerPos, Quaternion.identity);
-        Destroy(gameObject);
+        Item tempItem = from.currentItem;
+        int tempAmount = from.amount;
+
+        from.SetItem(to.currentItem, to.amount);
+        to.SetItem(tempItem, tempAmount);
     }
+
+    private void DropItem(InventorySlot from)
+    {
+        if (from.IsEmpty())
+            return;
+
+        // Проверяем, есть ли префаб для выброса
+        if (from.currentItem.worldPrefab != null)
+        {
+            GameObject dropped = Instantiate(from.currentItem.worldPrefab,
+                                             playerTransform.position + Vector3.forward,
+                                             Quaternion.identity);
+            Rigidbody rb = dropped.GetComponent<Rigidbody>();
+            if (rb != null)
+                rb.AddForce(playerTransform.forward * 2f + Vector3.up * 2f, ForceMode.Impulse);
+        }
+
+        from.ClearSlot();
+    }
+
 }

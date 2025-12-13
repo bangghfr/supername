@@ -7,6 +7,7 @@ public class Item : ScriptableObject
     public string itemName; // Название предмета
     public Sprite icon;     // Иконка предмета
     public bool isStackable; // Можно ли складывать в стопки
+    public GameObject worldPrefab; // Префаб предмета для выброса на землю
 
     // Метод, который может быть переопределен для уникальных действий с предметом
     public virtual void Use()

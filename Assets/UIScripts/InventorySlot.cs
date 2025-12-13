@@ -1,45 +1,63 @@
 using UnityEngine;
 using UnityEngine.UI;
-using static UnityEditor.Progress;
 
-// Класс для управления отдельным слотом инвентаря
 public class InventorySlot : MonoBehaviour
 {
-    public Image icon;      // Иконка предмета
-    public Button removeButton; // Кнопка удаления предмета
+    public Item currentItem;     // Предмет в слоте
+    public int amount;           // Количество предметов
 
-    public Item item;      // Хранимый предмет
+    [SerializeField] private Image icon; // UI-иконка предмета
 
-    // Метод для добавления предмета в слот
-    public void AddItem(Item newItem)
+    // Установить предмет в слот
+    public void SetItem(Item item, int quantity)
     {
-        item = newItem;
-        icon.sprite = item.icon;
-        icon.enabled = true;
-        removeButton.interactable = true;
-    }
+        currentItem = item;
+        amount = quantity;
 
-    // Метод для очистки слота
-    public void ClearSlot()
-    {
-        item = null;
-        icon.sprite = null;
-        icon.enabled = false;
-        removeButton.interactable = false;
-    }
-
-    // Метод для удаления предмета по нажатию кнопки
-    public void OnRemoveButton()
-    {
-        Inventory.instance.Remove(item);
-    }
-
-    // Метод для использования предмета
-    public void UseItem()
-    {
-        if (item != null)
+        if (icon != null)
         {
-            item.Use(); // Вызываем действие предмета
+            icon.sprite = item != null ? item.icon : null;
+            icon.enabled = item != null;
         }
     }
+
+    // Очистить слот
+    public void ClearSlot()
+    {
+        currentItem = null;
+        amount = 0;
+
+        if (icon != null)
+            icon.enabled = false;
+    }
+
+    // Проверить, пустой ли слот
+    public bool IsEmpty()
+    {
+        return currentItem == null;
+    }
+
+    public void AddItem(Item item, int quantity = 1)
+    {
+        if (item == null)
+            return;
+
+        // Если слот пустой, просто ставим предмет
+        if (IsEmpty())
+        {
+            SetItem(item, quantity);
+            return;
+        }
+
+        // Если предмет тот же и стекуемый — увеличиваем количество
+        if (currentItem == item && item.isStackable)
+        {
+            amount += quantity;
+            return;
+        }
+
+        // Если слот занят другим предметом — можно переопределить поведение
+        Debug.LogWarning("Слот занят другим предметом!");
+    }
+
 }

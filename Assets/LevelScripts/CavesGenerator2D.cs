@@ -1,6 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting.Dependencies.Sqlite;
 using UnityEngine;
+using static CavesGenerator2D;
 
 [DisallowMultipleComponent]
 public class CavesGenerator2D : MonoBehaviour
@@ -9,341 +11,475 @@ public class CavesGenerator2D : MonoBehaviour
     public class Biome
     {
         public string name;
-        public Sprite floorSprite;
-        public Sprite wallSprite;
-        public Sprite ceilingSprite;
+        public Color color = Color.white;
         public GameObject[] floorDecor;
-        public GameObject[] wallDecor;
-        public GameObject[] ceilingDecor;
-        public GameObject[] background;
-        public GameObject[] smallPlatforms; // Used for enemies, chests, etc.
-        public Color tint = Color.white;
     }
 
-    [Header("Cave Settings")]
+    [Header("Map Settings")]
     public int mapWidth = 200;
     public int mapHeight = 140;
+    public Color backgroundColor = Color.black; // Стены
+    public int roomCount = 12;
 
     [Header("Room Settings")]
-    public Vector2 roomSizeRange = new Vector2(6f, 12f);
-    public int roomShapePoints = 20;
-    public float roomNoise = 0.8f;
+    public Vector2 roomWidthRange = new Vector2(8f, 22f);
+    public Vector2 roomHeightRange = new Vector2(6f, 14f);
+    [Tooltip("0 = perfect rectangle, >0 adds corner noise")]
+    public float rectCornerNoise = 0.20f;
+    public float minRoomDistance = 2f;
 
-    [Header("Corridors")]
-    public float corridorWidth = 2.2f;
-    public int corridorBends = 2;
-
-    [Header("Rendering")]
-    public Material floorMaterial;
-    public Material wallMaterial;
-    public string floorSortingLayer = "Default";
-    public int floorSortingOrder = 0;
-    public string wallSortingLayer = "Foreground";
-    public int wallSortingOrder = 10;
+    [Header("Corridor Settings")]
+    public float corridorWidth = 2.5f;
 
     [Header("Prefabs")]
-    public GameObject decorSmallPrefab;
-    public GameObject decorLargePrefab;
-    public GameObject exitPrefab;
+    public GameObject decorPrefab;
     public GameObject playerSpawnPrefab;
-    public GameObject platformPrefab;
+    public GameObject exitPrefab;
 
     [Header("Biomes")]
     public Biome[] biomes;
 
     private List<Room> rooms = new List<Room>();
+    private List<Edge> corridors = new List<Edge>();
     private Transform mapParent;
 
-    // New variables
-    public int roomCount = 10;
-    private float minRoomDistance = 1.5f;
+    [Header("Enemy Settings")]
+    public GameObject enemyPrefab;                // Префаб врага
+    public int baseEnemies = 3;                   // На 1 уровне
+    public int maxLevels = 10;                    // Всего уровней
+    public float minEnemyDistance = 4f;           // Минимальная дистанция между врагами
 
-    private void Start() => GenerateLevel();
-
+    void Start()
+    {
+        GenerateLevel();
+    }
+    void SetLayerRecursively(Transform trans, int layer)
+    {
+        trans.gameObject.layer = layer;
+        foreach (Transform child in trans)
+        {
+            SetLayerRecursively(child, layer);
+        }
+    }
     public void GenerateLevel()
     {
         ClearPrevious();
         mapParent = new GameObject("CaveMap").transform;
         mapParent.parent = transform;
+        // Изменяем слой GameObject, к которому прикреплен Transform
+        mapParent.gameObject.layer = LayerMask.NameToLayer("Ignore Raycast");
 
-        GenerateRooms();
-        ConnectRooms();
-        GenerateDecorAndPlatforms();
+        // Если нужно изменить слой рекурсивно для всех дочерних объектов
+        SetLayerRecursively(mapParent, LayerMask.NameToLayer("Ignore Raycast"));
+
+        // 1) Создание комнат
+        int attempts = 0;
+        while (rooms.Count < roomCount && attempts < roomCount * 100)
+        {
+            attempts++;
+            Room r = CreateRandomRoom();
+            if (r == null) continue;
+            if (rooms.Any(other => RoomsOverlap(r, other))) continue;
+            rooms.Add(r);
+        }
+
+        if (rooms.Count == 0) return;
+
+        // 2) Генерация коридоров через MST
+        var edges = GenerateAllEdges();
+        var mst = BuildMST(rooms, edges);
+        corridors.AddRange(mst);
+
+        // 3) Спавн игрока и выхода
         PlacePlayerAndExit();
+
+        // 4) Генерация визуальной карты
+        GenerateMapTexture();
+
+        // 5) Генерация коллайдеров по внешней границе
+        GenerateExternalWallColliders();
     }
 
     private void ClearPrevious()
     {
         if (mapParent != null) DestroyImmediate(mapParent.gameObject);
         rooms.Clear();
+        corridors.Clear();
     }
 
-    private void GenerateRooms()
+    private Room CreateRandomRoom()
     {
-        int created = 0;
-        int attempts = 0;
+        float w = Random.Range(roomWidthRange.x, roomWidthRange.y);
+        float h = Random.Range(roomHeightRange.x, roomHeightRange.y);
+        Vector2 pos = new Vector2(
+            Random.Range(10 + w / 2f, mapWidth - 10 - w / 2f),
+            Random.Range(10 + h / 2f, mapHeight - 10 - h / 2f)
+        );
+        if (biomes == null || biomes.Length == 0) return null;
+        Biome biome = biomes[Random.Range(0, biomes.Length)];
+        return new Room(pos, w, h, rectCornerNoise, biome);
+    }
 
-        while (created < roomCount && attempts < roomCount * 40)
+    private bool RoomsOverlap(Room a, Room b)
+    {
+        Rect ra = a.GetAABB();
+        Rect rb = b.GetAABB();
+        ra.xMin -= minRoomDistance;
+        ra.yMin -= minRoomDistance;
+        ra.xMax += minRoomDistance;
+        ra.yMax += minRoomDistance;
+        return ra.Overlaps(rb);
+    }
+
+    private List<Edge> GenerateAllEdges()
+    {
+        var list = new List<Edge>();
+        for (int i = 0; i < rooms.Count; i++)
+            for (int j = i + 1; j < rooms.Count; j++)
+                list.Add(new Edge(rooms[i], rooms[j]));
+        return list;
+    }
+
+    private List<Edge> BuildMST(List<Room> nodes, List<Edge> edges)
+    {
+        edges.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+        var ds = new DisjointSet(nodes.Count);
+        var mapIndex = nodes.Select((r, idx) => new { r, idx }).ToDictionary(x => x.r, x => x.idx);
+        List<Edge> result = new List<Edge>();
+        foreach (var e in edges)
         {
-            attempts++;
-
-            Vector2 pos = new Vector2(
-                Random.Range(10, mapWidth - 10),
-                Random.Range(10, mapHeight - 10)
-            );
-
-            float size = Random.Range(roomSizeRange.x, roomSizeRange.y);
-            Biome biome = biomes[Random.Range(0, biomes.Length)];
-            Room r = new Room(pos, size, roomShapePoints, roomNoise, biome, platformPrefab);
-
-            if (r.polygon == null || r.polygon.Length < 5 || ShouldSkipCollider(r, rooms)) continue;
-
-            r.CreateGameObject(mapParent, floorMaterial, wallMaterial, floorSortingLayer, floorSortingOrder, wallSortingLayer, wallSortingOrder, decorSmallPrefab, decorLargePrefab);
-            rooms.Add(r);
-            created++;
+            int ia = mapIndex[e.a];
+            int ib = mapIndex[e.b];
+            if (ds.Find(ia) != ds.Find(ib))
+            {
+                ds.Union(ia, ib);
+                result.Add(e);
+            }
         }
-    }
-
-    private bool ShouldSkipCollider(Room room, List<Room> existingRooms)
-    {
-        foreach (var otherRoom in existingRooms)
-        {
-            if (RoomsOverlap(room, otherRoom, minRoomDistance))
-                return true;
-        }
-        return false;
-    }
-
-    private bool RoomsOverlap(Room a, Room b, float minDist)
-    {
-        float distance = Vector2.Distance(a.Center, b.Center);
-        return distance < (a.Size + b.Size) * 0.8f + minDist;
-    }
-
-    private void ConnectRooms()
-    {
-        if (rooms.Count < 2) return;
-
-        rooms.Sort((a, b) => a.Center.x.CompareTo(b.Center.x));
-
-        for (int i = 0; i < rooms.Count - 1; i++)
-        {
-            rooms[i].CreateCorridorTo(rooms[i + 1], corridorWidth, corridorBends, wallMaterial, wallSortingLayer, wallSortingOrder);
-        }
-    }
-
-    private void GenerateDecorAndPlatforms()
-    {
-        foreach (var room in rooms)
-            room.BuildDecor();
+        return result;
     }
 
     private void PlacePlayerAndExit()
     {
         if (rooms.Count == 0) return;
+        Room centerRoom = rooms.OrderBy(r => Vector2.Distance(r.Center, new Vector2(mapWidth / 2f, mapHeight / 2f))).First();
+        if (playerSpawnPrefab != null)
+            Instantiate(playerSpawnPrefab, new Vector3(centerRoom.Center.x, centerRoom.Center.y, -0.1f), Quaternion.identity, mapParent);
 
-        Vector2 avg = Vector2.zero;
-        foreach (var r in rooms) avg += r.Center;
-        avg /= rooms.Count;
+        Room farRoom = rooms.OrderByDescending(r => Vector2.Distance(r.Center, centerRoom.Center)).First();
+        Vector2 edgePoint = ProjectToEdge(farRoom.Center);
+        if (!rooms.Any(r => r.PointInside(edgePoint)))
+            corridors.Add(new Edge(farRoom, new Room(edgePoint, 0, 0, 0, null)));
 
-        Room centerRoom = rooms.OrderBy(r => Vector2.Distance(r.Center, avg)).First();
-        Instantiate(playerSpawnPrefab, centerRoom.Center, Quaternion.identity);
+        if (exitPrefab != null)
+            Instantiate(exitPrefab, new Vector3(edgePoint.x, edgePoint.y, -0.1f), Quaternion.identity, mapParent);
+    }
 
-        var distantRooms = rooms
-            .OrderByDescending(r => Vector2.Distance(r.Center, centerRoom.Center))
-            .Take(6)
-            .ToList();
-
-        int exitsCount = RandomExitCount();
-
-        for (int i = 0; i < exitsCount; i++)
+    private Vector2 ProjectToEdge(Vector2 p)
+    {
+        List<(float dist, Vector2 pos)> edges = new List<(float, Vector2)>
         {
-            Room target = distantRooms[Random.Range(0, distantRooms.Count)];
-            distantRooms.Remove(target);
-            Instantiate(exitPrefab, target.Center, Quaternion.identity);
+            (p.x, new Vector2(1f, Mathf.Clamp(p.y, 1f, mapHeight - 1f))),
+            (mapWidth - p.x, new Vector2(mapWidth - 1f, Mathf.Clamp(p.y, 1f, mapHeight - 1f))),
+            (p.y, new Vector2(Mathf.Clamp(p.x, 1f, mapWidth - 1f), 1f)),
+            (mapHeight - p.y, new Vector2(Mathf.Clamp(p.x, 1f, mapWidth - 1f), mapHeight - 1f))
+        };
+        var sorted = edges.OrderByDescending(e => e.dist).Take(3).ToList();
+        return sorted[Random.Range(0, sorted.Count)].pos;
+    }
+
+    private void GenerateMapTexture()
+    {
+        Texture2D tex = new Texture2D(mapWidth, mapHeight);
+        Color[] pixels = new Color[mapWidth * mapHeight];
+
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = backgroundColor;
+
+        foreach (var room in rooms)
+        {
+            Rect aabb = room.GetAABB();
+            int minX = Mathf.Clamp(Mathf.FloorToInt(aabb.xMin), 0, mapWidth - 1);
+            int maxX = Mathf.Clamp(Mathf.CeilToInt(aabb.xMax), 0, mapWidth - 1);
+            int minY = Mathf.Clamp(Mathf.FloorToInt(aabb.yMin), 0, mapHeight - 1);
+            int maxY = Mathf.Clamp(Mathf.CeilToInt(aabb.yMax), 0, mapHeight - 1);
+
+            for (int x = minX; x <= maxX; x++)
+                for (int y = minY; y <= maxY; y++)
+                {
+                    Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                    if (room.PointInside(p)) pixels[y * mapWidth + x] = Color.clear;
+                }
         }
-    }
 
-    private int RandomExitCount()
-    {
-        float r = Random.value;
-        if (r < 0.65f) return 1;
-        if (r < 0.9f) return 2;
-        return 3;
-    }
-
-    private void BuildEnemiesAndChests(Room room)
-    {
-        void SpawnEnemies(GameObject[] enemyPrefabs)
+        foreach (var edge in corridors)
         {
-            if (enemyPrefabs == null || enemyPrefabs.Length == 0) return;
-            int count = Random.Range(2, 5);
-            for (int i = 0; i < count; i++)
+            Vector2 a = edge.a.Center;
+            Vector2 b = edge.b.Center;
+            int steps = Mathf.CeilToInt(Vector2.Distance(a, b));
+            for (int i = 0; i <= steps; i++)
             {
-                int idx = Random.Range(0, room.polygon.Length);
-                Vector2 pos = room.polygon[idx];
-                Object.Instantiate(enemyPrefabs[Random.Range(0, enemyPrefabs.Length)], pos, Quaternion.identity, room.roomGO.transform);
+                Vector2 p = Vector2.Lerp(a, b, i / (float)steps);
+                int px = Mathf.Clamp(Mathf.RoundToInt(p.x), 0, mapWidth - 1);
+                int py = Mathf.Clamp(Mathf.RoundToInt(p.y), 0, mapHeight - 1);
+                int rad = Mathf.CeilToInt(corridorWidth / 2f);
+                for (int dx = -rad; dx <= rad; dx++)
+                    for (int dy = -rad; dy <= rad; dy++)
+                    {
+                        int x = px + dx;
+                        int y = py + dy;
+                        if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight)
+                            pixels[y * mapWidth + x] = Color.clear;
+                    }
             }
         }
 
-        void SpawnChests(GameObject[] chestPrefabs)
+        tex.SetPixels(pixels);
+        tex.filterMode = FilterMode.Point;
+        tex.Apply();
+
+        GameObject go = new GameObject("MapBackground");
+        go.transform.parent = mapParent;
+        go.transform.position = new Vector3(mapWidth / 2f, mapHeight / 2f, 0);
+
+        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = Sprite.Create(tex, new Rect(0, 0, mapWidth, mapHeight), Vector2.one * 0.5f, 1f);
+        sr.sortingOrder = -10;
+
+        Rigidbody2D rb = go.AddComponent<Rigidbody2D>();
+        rb.bodyType = RigidbodyType2D.Static;
+
+    }
+
+    private void GenerateExternalWallColliders()
+    {
+        // bool[,] карта: true = стена, false = пустота
+        bool[,] map = new bool[mapWidth, mapHeight];
+
+        // 1) Задаём стены
+        for (int x = 0; x < mapWidth; x++)
+            for (int y = 0; y < mapHeight; y++)
+                map[x, y] = true;
+
+        // 2) "Вырезаем" комнаты
+        foreach (var room in rooms)
         {
-            if (chestPrefabs == null || chestPrefabs.Length == 0) return;
-            int count = Random.Range(1, 3);
-            for (int i = 0; i < count; i++)
+            Rect aabb = room.GetAABB();
+            int minX = Mathf.Clamp(Mathf.FloorToInt(aabb.xMin), 0, mapWidth - 1);
+            int maxX = Mathf.Clamp(Mathf.CeilToInt(aabb.xMax), 0, mapWidth - 1);
+            int minY = Mathf.Clamp(Mathf.FloorToInt(aabb.yMin), 0, mapHeight - 1);
+            int maxY = Mathf.Clamp(Mathf.CeilToInt(aabb.yMax), 0, mapHeight - 1);
+
+            for (int x = minX; x <= maxX; x++)
+                for (int y = minY; y <= maxY; y++)
+                {
+                    Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                    if (room.PointInside(p)) map[x, y] = false;
+                }
+        }
+
+        // 3) "Вырезаем" коридоры
+        foreach (var edge in corridors)
+        {
+            Vector2 a = edge.a.Center;
+            Vector2 b = edge.b.Center;
+            int steps = Mathf.CeilToInt(Vector2.Distance(a, b));
+            for (int i = 0; i <= steps; i++)
             {
-                int idx = Random.Range(0, room.polygon.Length);
-                Vector2 pos = room.polygon[idx];
-                Object.Instantiate(chestPrefabs[Random.Range(0, chestPrefabs.Length)], pos, Quaternion.identity, room.roomGO.transform);
+                Vector2 p = Vector2.Lerp(a, b, i / (float)steps);
+                int px = Mathf.Clamp(Mathf.RoundToInt(p.x), 0, mapWidth - 1);
+                int py = Mathf.Clamp(Mathf.RoundToInt(p.y), 0, mapHeight - 1);
+                int rad = Mathf.CeilToInt(corridorWidth / 2f);
+                for (int dx = -rad; dx <= rad; dx++)
+                    for (int dy = -rad; dy <= rad; dy++)
+                    {
+                        int x = px + dx;
+                        int y = py + dy;
+                        if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight)
+                            map[x, y] = false;
+                    }
             }
         }
 
-        SpawnEnemies(room.Biome.smallPlatforms);  // Use specific biome instance for enemies
-        SpawnChests(room.Biome.smallPlatforms);   // Use specific biome instance for chests
-    }
-
-    private void DrawColliderOutline(Vector2[] points, GameObject go)
-    {
-        LineRenderer lineRenderer = go.AddComponent<LineRenderer>();
-        lineRenderer.positionCount = points.Length + 1;
-        lineRenderer.loop = true;
-        lineRenderer.startWidth = 0.05f;
-        lineRenderer.endWidth = 0.05f;
-        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-        lineRenderer.startColor = Color.black;
-        lineRenderer.endColor = Color.black;
-
-        for (int i = 0; i < points.Length; i++)
+        // 4) Создаём коллайдеры только по внешней границе
+        for (int x = 0; x < mapWidth; x++)
         {
-            lineRenderer.SetPosition(i, new Vector3(points[i].x, points[i].y, 0));
+            for (int y = 0; y < mapHeight; y++)
+            {
+                if (map[x, y])
+                {
+                    if (y + 1 < mapHeight && !map[x, y + 1]) CreateWallCollider(x, y, Vector2.up);
+                    if (y - 1 >= 0 && !map[x, y - 1]) CreateWallCollider(x, y, Vector2.down);
+                    if (x - 1 >= 0 && !map[x - 1, y]) CreateWallCollider(x, y, Vector2.left);
+                    if (x + 1 < mapWidth && !map[x + 1, y]) CreateWallCollider(x, y, Vector2.right);
+                }
+            }
         }
-        lineRenderer.SetPosition(points.Length, new Vector3(points[0].x, points[0].y, 0));
     }
 
-    #region Room Class
+    private void CreateWallCollider(int x, int y, Vector2 direction)
+    {
+        GameObject go = new GameObject("WallCollider");
+        go.transform.parent = mapParent;
+        go.transform.position = new Vector3(x + 0.5f, y + 0.5f, 0);
+
+        BoxCollider2D bc = go.AddComponent<BoxCollider2D>();
+        bc.size = new Vector2(1f, 1f);
+
+        if (direction == Vector2.up) bc.offset = new Vector2(0, 0.5f);
+        if (direction == Vector2.down) bc.offset = new Vector2(0, -0.5f);
+        if (direction == Vector2.left) bc.offset = new Vector2(-0.5f, 0);
+        if (direction == Vector2.right) bc.offset = new Vector2(0.5f, 0);
+        Rigidbody2D rb = go.AddComponent<Rigidbody2D>();
+        rb.bodyType = RigidbodyType2D.Static;
+    }
+
+    #region Helper classes
+
     public class Room
     {
         public Vector2 Center;
-        public float Size;
+        public float Width;
+        public float Height;
         public Biome Biome;
-        public Vector2[] polygon; // Polygon that defines the room's shape
-        public GameObject roomGO;
-        private GameObject platformPrefab;
+        public Vector2[] polygon;
+        private float cornerNoise;
 
-        public Room(Vector2 center, float size, int points, float noise, Biome biome, GameObject platformPrefab)
+        public Room(Vector2 center, float width, float height, float cornerNoise, Biome biome)
         {
             Center = center;
-            Size = size;
+            Width = width;
+            Height = height;
             Biome = biome;
-            this.platformPrefab = platformPrefab;
-            polygon = GeneratePolygon(points, noise);
+            this.cornerNoise = Mathf.Clamp01(cornerNoise);
+            polygon = GenerateRectPolygon();
         }
 
-        private Vector2[] GeneratePolygon(int points, float noise)
+        private Vector2[] GenerateRectPolygon()
         {
-            List<Vector2> pts = new List<Vector2>();
-            float angleStep = 360f / points;
+            float hw = Width / 2f;
+            float hh = Height / 2f;
+            Vector2[] corners = new Vector2[4];
+            corners[0] = new Vector2(-hw, -hh);
+            corners[1] = new Vector2(hw, -hh);
+            corners[2] = new Vector2(hw, hh);
+            corners[3] = new Vector2(-hw, hh);
 
-            for (int i = 0; i < points; i++)
+            for (int i = 0; i < 4; i++)
             {
-                float angle = i * angleStep * Mathf.Deg2Rad;
-                // Using PerlinNoise to make rooms more varied
-                float radius = Size * (1 + Mathf.PerlinNoise(Mathf.Cos(angle) * 0.5f, Mathf.Sin(angle) * 0.5f) * noise);
-                pts.Add(new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius + Center);
+                Vector2 dir = corners[i].normalized;
+                float maxn = Mathf.Min(Width, Height) * cornerNoise;
+                float nx = Mathf.PerlinNoise((Center.x + i * 17.13f) * 0.07f, (Center.y) * 0.07f);
+                float ny = Mathf.PerlinNoise((Center.x) * 0.07f, (Center.y + i * 29.7f) * 0.07f);
+                float rnd = (nx + ny) * 0.5f - 0.5f;
+                corners[i] += dir * rnd * maxn + Center;
             }
-            return ChaikinSmooth(pts, 2).ToArray();
+            return corners;
         }
 
-        private List<Vector2> ChaikinSmooth(List<Vector2> pts, int iterations)
+        public Rect GetAABB()
         {
-            for (int iter = 0; iter < iterations; iter++)
+            float minX = polygon.Min(p => p.x);
+            float maxX = polygon.Max(p => p.x);
+            float minY = polygon.Min(p => p.y);
+            float maxY = polygon.Max(p => p.y);
+            return new Rect(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        public bool PointInside(Vector2 p)
+        {
+            bool inside = false;
+            for (int i = 0, j = polygon.Length - 1; i < polygon.Length; j = i++)
             {
-                List<Vector2> next = new List<Vector2>();
-                for (int i = 0; i < pts.Count - 1; i++)
+                if (((polygon[i].y > p.y) != (polygon[j].y > p.y)) &&
+                    (p.x < (polygon[j].x - polygon[i].x) * (p.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x))
                 {
-                    Vector2 p0 = pts[i];
-                    Vector2 p1 = pts[i + 1];
-                    Vector2 q = (p0 + p1) * 0.25f;  // Point between p0 and p1
-                    Vector2 r = (p0 + p1) * 0.75f;  // Point after q
-
-                    next.Add(p0);
-                    next.Add(q);
-                    next.Add(r);
-                }
-                next.Add(pts[pts.Count - 1]);
-                pts = next;
-            }
-            return pts;
-        }
-
-        public void CreateGameObject(Transform parent, Material floorMat, Material wallMat, string floorLayer, int floorOrder, string wallLayer, int wallOrder, GameObject decorPrefab, GameObject largePrefab)
-        {
-            roomGO = new GameObject("Room");
-            roomGO.transform.parent = parent;
-
-            // Create floor and walls
-            CreateFloor(floorMat, floorLayer, floorOrder);
-            CreateWalls(wallMat, wallLayer, wallOrder);
-        }
-
-        public void CreateFloor(Material floorMat, string layer, int order)
-        {
-            GameObject floor = new GameObject("Floor");
-            floor.transform.parent = roomGO.transform;
-            SpriteRenderer sr = floor.AddComponent<SpriteRenderer>();
-            sr.sprite = Biome.floorSprite;
-            sr.sortingLayerName = layer;
-            sr.sortingOrder = order;
-        }
-
-        public void CreateWalls(Material wallMat, string layer, int order)
-        {
-            GameObject walls = new GameObject("Walls");
-            walls.transform.parent = roomGO.transform;
-            SpriteRenderer sr = walls.AddComponent<SpriteRenderer>();
-            sr.sprite = Biome.wallSprite;
-            sr.sortingLayerName = layer;
-            sr.sortingOrder = order;
-        }
-
-        public void BuildDecor()
-        {
-            // Place decorative objects based on room edges
-            Vector2[] edgePositions = GetEdgePositions();
-            BuildDecor(edgePositions);
-        }
-
-        private void BuildDecor(Vector2[] edgePositions)
-        {
-            void SpawnDecor(GameObject[] prefabs, Vector2[] positions)
-            {
-                if (prefabs == null || prefabs.Length == 0) return;
-
-                foreach (var pos in positions)
-                {
-                    Instantiate(prefabs[Random.Range(0, prefabs.Length)], pos, Quaternion.identity, roomGO.transform);
+                    inside = !inside;
                 }
             }
-
-            // Spawn decoration along room edges
-            SpawnDecor(Biome.floorDecor, edgePositions);
-        }
-
-        private Vector2[] GetEdgePositions()
-        {
-            List<Vector2> positions = new List<Vector2>();
-
-            for (int i = 0; i < polygon.Length; i++)
-            {
-                positions.Add(polygon[i]);
-            }
-            return positions.ToArray();
-        }
-
-        public void CreateCorridorTo(Room other, float width, int bends, Material material, string layer, int order)
-        {
-            // Corridor generation logic goes here
+            return inside;
         }
     }
+
+    public class Edge
+    {
+        public Room a, b;
+        public float Distance;
+        public Edge(Room a, Room b)
+        {
+            this.a = a; this.b = b;
+            Distance = Vector2.Distance(a.Center, b.Center);
+        }
+    }
+
+    public class DisjointSet
+    {
+        int[] parent;
+        int[] rank;
+        public DisjointSet(int n)
+        {
+            parent = new int[n];
+            rank = new int[n];
+            for (int i = 0; i < n; i++) parent[i] = i;
+        }
+        public int Find(int x) => parent[x] != x ? (parent[x] = Find(parent[x])) : x;
+        public void Union(int a, int b)
+        {
+            int ra = Find(a), rb = Find(b);
+            if (ra == rb) return;
+            if (rank[ra] < rank[rb]) parent[ra] = rb;
+            else if (rank[rb] < rank[ra]) parent[rb] = ra;
+            else { parent[rb] = ra; rank[ra]++; }
+        }
+    }
+    private void SpawnEnemies()
+    {
+        if (enemyPrefab == null) return;
+        if (rooms.Count == 0) return;
+
+        // Определяем номер уровня по индексам сцен
+        int level = Mathf.Clamp(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex, 0, maxLevels - 1);
+
+        // Количество врагов растет плавно: 3, 4, 5, ..., 12
+        int enemyCount = baseEnemies + level;
+
+        List<Vector2> usedPositions = new List<Vector2>();
+
+        for (int i = 0; i < enemyCount; i++)
+        {
+            // Выбираем случайную комнату
+            Room room = rooms[Random.Range(0, rooms.Count)];
+
+            Vector2 spawnPos;
+            int attempts = 0;
+
+            // Выбираем точку, пока она:
+            // 1) находится внутри комнаты
+            // 2) далеко от остальных врагов
+            do
+            {
+                Rect aabb = room.GetAABB();
+                float x = Random.Range(aabb.xMin, aabb.xMax);
+                float y = Random.Range(aabb.yMin, aabb.yMax);
+                spawnPos = new Vector2(x, y);
+
+                attempts++;
+
+            } while (
+                (!room.PointInside(spawnPos) ||
+                usedPositions.Exists(p => Vector2.Distance(p, spawnPos) < minEnemyDistance))
+                && attempts < 60
+            );
+
+            usedPositions.Add(spawnPos);
+
+            Instantiate(
+                enemyPrefab,
+                new Vector3(spawnPos.x, spawnPos.y, -0.2f),
+                Quaternion.identity,
+                mapParent
+            );
+        }
+    }
+
     #endregion
 }
