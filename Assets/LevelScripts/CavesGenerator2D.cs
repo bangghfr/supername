@@ -36,6 +36,9 @@ public class CavesGenerator2D : MonoBehaviour
     public GameObject playerSpawnPrefab;
     public GameObject exitPrefab;
 
+    [Header("Rigibody2D")]
+    private Rigidbody2D _backGround_rb;
+
     [Header("Biomes")]
     public Biome[] biomes;
 
@@ -247,7 +250,6 @@ public class CavesGenerator2D : MonoBehaviour
 
         Rigidbody2D rb = go.AddComponent<Rigidbody2D>();
         rb.bodyType = RigidbodyType2D.Static;
-
     }
 
     private void GenerateExternalWallColliders()

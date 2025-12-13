@@ -193,7 +193,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 95fe943f460250f4eb0fb20f14b17193, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ropeSpriteAsset: {fileID: 7482667652216324306, guid: 721f0d411c399644d80750b1a6c33da2, type: 3}
+  ropeSpriteAsset: {fileID: 21300000, guid: 64eebde81b28b4bf09d486851692948b, type: 3}
 --- !u!70 &4134470142267947848
 CapsuleCollider2D:
   m_ObjectHideFlags: 0

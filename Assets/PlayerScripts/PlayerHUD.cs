@@ -5,14 +5,21 @@ public class PlayerHUD : MonoBehaviour
 {
     public MoveController player;
 
-    public Slider dashCooldownBar;
-    public Slider superDashCooldownBar;
-    public Text hpText;
+    public Slider hpSlider;
+    public Slider armorSlider;
+    public Slider sanitySlider;
 
     void Update()
     {
-        dashCooldownBar.value = player.GetDashCooldown01();
-        superDashCooldownBar.value = player.GetSuperDashCooldown01();
-        hpText.text = player._playerHp.ToString();
+        if (!player) return;
+
+        // Обновляем здоровье
+        hpSlider.value = Mathf.Clamp01(player._playerHp / 100f);
+
+        // Обновляем броню
+        armorSlider.value = Mathf.Clamp01(player._playerArmor / 100f);
+
+        // Обновляем психику
+        sanitySlider.value = Mathf.Clamp01(player._playerSanity / 100f);
     }
 }

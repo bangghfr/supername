@@ -1,0 +1,238 @@
+{
+  "entities": [
+    {
+      "key": "PLAY",
+      "translations": [
+        {
+          "language": "English",
+          "value": "PLAY"
+        },
+        {
+          "language": "Russian",
+          "value": "ИГРАТЬ"
+        }
+      ]
+    },
+    {
+      "key": "SETTINGS",
+      "translations": [
+        {
+          "language": "English",
+          "value": "SETTINGS"
+        },
+        {
+          "language": "Russian",
+          "value": "НАСТРОЙКИ"
+        }
+      ]
+    },
+    {
+      "key": "EXIT",
+      "translations": [
+        {
+          "language": "English",
+          "value": "EXIT"
+        },
+        {
+          "language": "Russian",
+          "value": "ВЫХОД"
+        }
+      ]
+    },
+    {
+      "key": "INFO",
+      "translations": [
+        {
+          "language": "English",
+          "value": "INFO"
+        },
+        {
+          "language": "Russian",
+          "value": "ИНФО"
+        }
+      ]
+    },
+    {
+      "key": "STARTGAME",
+      "translations": [
+        {
+          "language": "English",
+          "value": "Start Game"
+        },
+        {
+          "language": "Russian",
+          "value": "Начать игру"
+        }
+      ]
+    },
+    {
+      "key": "AverageLevel_Inventory",
+      "translations": [
+        {
+          "language": "English",
+          "value": "Inventory"
+        },
+        {
+          "language": "Russian",
+          "value": "Инвентарь"
+        }
+      ]
+    },
+    {
+      "key": "AverageLevel_Menu",
+      "translations": [
+        {
+          "language": "English",
+          "value": "Menu"
+        },
+        {
+          "language": "Russian",
+          "value": "Меню"
+        }
+      ]
+    },
+    {
+      "key": "AverageLevel_Continue",
+      "translations": [
+        {
+          "language": "English",
+          "value": "Continue"
+        },
+        {
+          "language": "Russian",
+          "value": "Продолжить"
+        }
+      ]
+    },
+    {
+      "key": "AverageLevel_Settings",
+      "translations": [
+        {
+          "language": "English",
+          "value": "Settings"
+        },
+        {
+          "language": "Russian",
+          "value": "Настройки"
+        }
+      ]
+    },
+    {
+      "key": "AverageLevel_Exit",
+      "translations": [
+        {
+          "language": "English",
+          "value": "Exit"
+        },
+        {
+          "language": "Russian",
+          "value": "Выйти"
+        }
+      ]
+    },
+    {
+      "key": "DeepFloat50M",
+      "translations": [
+        {
+          "language": "English",
+          "value": "50 meters, not that deep, right?"
+        },
+        {
+          "language": "Russian",
+          "value": "50 метров, не так глубоко, так?"
+        }
+      ]
+    },
+    {
+      "key": "DeepFloat100M",
+      "translations": [
+        {
+          "language": "English",
+          "value": "100 meters, not the most comfortable place..."
+        },
+        {
+          "language": "Russian",
+          "value": "100 метров, не самое уютное место..."
+        }
+      ]
+    },
+    {
+      "key": "DeepFloat150M",
+      "translations": [
+        {
+          "language": "English",
+          "value": "150 meters, not the most comfortable place..."
+        },
+        {
+          "language": "Russian",
+          "value": "150 метров, не самое уютное место..."
+        }
+      ]
+    },
+    {
+      "key": "DeepFloat200M",
+      "translations": [
+        {
+          "language": "English",
+          "value": "200 meters, there is no way back."
+        },
+        {
+          "language": "Russian",
+          "value": "200 метров, обратного пути нет."
+        }
+      ]
+    },
+    {
+      "key": "DeepFloat250M",
+      "translations": [
+        {
+          "language": "English",
+          "value": "250 meters"
+        },
+        {
+          "language": "Russian",
+          "value": "250 метров"
+        }
+      ]
+    },
+    {
+      "key": "DeepFloat300M",
+      "translations": [
+        {
+          "language": "English",
+          "value": "300 meters"
+        },
+        {
+          "language": "Russian",
+          "value": "300 метров"
+        }
+      ]
+    },
+    {
+      "key": "MainMenu_MainMenuText",
+      "translations": [
+        {
+          "language": "English",
+          "value": "Main Menu"
+        },
+        {
+          "language": "Russian",
+          "value": "Главное меню"
+        }
+      ]
+    },
+    {
+      "key": "MainMenu_Play",
+      "translations": [
+        {
+          "language": "English",
+          "value": "Play"
+        },
+        {
+          "language": "Russian",
+          "value": "Играть"
+        }
+      ]
+    }
+  ]
+}

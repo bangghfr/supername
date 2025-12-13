@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 
 [RequireComponent(typeof(InputReceiver))]
 [RequireComponent(typeof(Rigidbody2D))]
@@ -9,7 +10,11 @@ public class MoveController : MonoBehaviour
     private Rigidbody2D rb;
 
     // ================== PLAYER STATE ==================
+
+    [Header("Player Stats")]
     public int _playerHp = 100;
+    public int _playerArmor = 100;
+    public float _playerSanity = 100f; // 0-100
 
     private bool isGrounded;
     private bool isHooked;
@@ -47,8 +52,10 @@ public class MoveController : MonoBehaviour
     public float hookPullForce = 22f;
     public float hookReleaseBoost = 8f;
     public float hookSideForce = 18f;
+    public float hookSpawnOffset = 0.6f;
 
     private Vector2 hookPoint;
+    private Vector2 hookStartPoint;   // <<< ВАЖНО
     private float ropeLength;
 
     // ================== DASH ==================
@@ -120,8 +127,10 @@ public class MoveController : MonoBehaviour
 
         rb.AddForce(Vector2.right * inputX * airAcceleration * controlMultiplier, ForceMode2D.Force);
 
-        float clampedX = Mathf.Clamp(rb.velocity.x, -airMaxSpeed, airMaxSpeed);
-        rb.velocity = new Vector2(clampedX, rb.velocity.y);
+        rb.velocity = new Vector2(
+            Mathf.Clamp(rb.velocity.x, -airMaxSpeed, airMaxSpeed),
+            rb.velocity.y
+        );
     }
 
     // ================== JUMP ==================
@@ -170,21 +179,40 @@ public class MoveController : MonoBehaviour
 
     void TryHook()
     {
-        Vector3 mouse = Input.mousePosition;
-        mouse.z = Mathf.Abs(Camera.main.transform.position.z);
-        Vector2 world = Camera.main.ScreenToWorldPoint(mouse);
+        Camera cam = Camera.main;
 
-        Vector2 dir = world - (Vector2)transform.position;
-        if (dir.magnitude > hookMaxDistance)
-            dir = dir.normalized * hookMaxDistance;
+        Vector2 playerPos = transform.position;
 
-        int mask = 1 << LayerMask.NameToLayer("Ignore Raycast");
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, dir.normalized, dir.magnitude, mask);
+        Vector3 mouseScreen = Input.mousePosition;
+        mouseScreen.z = Mathf.Abs(cam.transform.position.z);
+        Vector2 mouseWorld = cam.ScreenToWorldPoint(mouseScreen);
 
-        if (hit.collider == null) return;
+        Vector2 dir = (mouseWorld - playerPos).normalized;
+
+        // ВСЕ СЛОИ, КРОМЕ Ignore Raycast
+        int mask = ~(1 << LayerMask.NameToLayer("Ignore Raycast"));
+
+        // старт крюка НЕ из центра игрока
+        hookStartPoint = playerPos + dir * hookSpawnOffset;
+
+        RaycastHit2D hit = Physics2D.Raycast(
+            hookStartPoint,
+            dir,
+            hookMaxDistance,
+            mask
+        );
+
+        if (!hit)
+            return;
 
         hookPoint = hit.point;
-        ropeLength = Mathf.Clamp(Vector2.Distance(transform.position, hookPoint), hookMinDistance, hookMaxDistance);
+
+        ropeLength = Mathf.Clamp(
+            Vector2.Distance(playerPos, hookPoint),
+            hookMinDistance,
+            hookMaxDistance
+        );
+
         isHooked = true;
     }
 
@@ -258,16 +286,20 @@ public class MoveController : MonoBehaviour
     // ================== HELPERS ==================
     public bool IsHooked() => isHooked;
     public Vector2 GetHookPoint() => hookPoint;
+    public Vector2 GetHookStartPoint() => hookStartPoint; // <<< для визуала
 
     // ================== COOLDOWNS FOR UI ==================
     public float GetDashCooldown01()
     {
-        return Mathf.Clamp01(1f); // обычный деш без кулдауна
+        // обычный деш без кулдауна — всегда готов
+        return 1f;
     }
 
     public float GetSuperDashCooldown01()
     {
-        return Mathf.Clamp01((Time.time - lastSuperDashTime) / superDashCooldown);
+        return Mathf.Clamp01(
+            (Time.time - lastSuperDashTime) / superDashCooldown
+        );
     }
 
 }

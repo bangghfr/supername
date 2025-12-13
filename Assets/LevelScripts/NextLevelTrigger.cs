@@ -1,48 +1,55 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using TMPro;
 
-public class NextLevelTrigger : MonoBehaviour
+public class SceneTextManager : MonoBehaviour
 {
-    // Настройки увеличения сложности
-    public float mapSizeMultiplier = 1.2f;
-    public float roomCountMultiplier = 1.2f;
-    public float corridorWidthMultiplier = 1.1f;
+    public TextMeshProUGUI sceneText;
+    public float fadeDuration = 2f; // Длительность затухания
+    private float fadeTimer = 0f;
+    private bool hasFaded = false;
+    private bool hasFlickered = false;
 
-    // Новый параметр — множитель количества врагов
-    public float enemyMultiplier = 1.15f;
-
-    private void OnTriggerEnter2D(Collider2D other)
+    private void Start()
     {
-        if (!other.CompareTag("Player")) return;
+        int sceneIndex = SceneManager.GetActiveScene().buildIndex;
 
-        // Увеличиваем прогрессию (теперь передаём также множитель врагов)
-        LevelProgression.IncreaseDifficulty(mapSizeMultiplier, roomCountMultiplier, corridorWidthMultiplier, enemyMultiplier);
+        // Устанавливаем красный цвет в зависимости от индекса сцены
+        float redValue = Mathf.Clamp01(sceneIndex * 0.1f); // Например, каждый индекс добавляет 0.1 к красному
+        sceneText.color = new Color(redValue, 0f, 0f, 1f);
 
-        // Переходим на следующую сцену по индексу
-        int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
-        int nextSceneIndex = currentSceneIndex + 1;
+        // Текст можно сразу показать
+        sceneText.gameObject.SetActive(true);
+    }
 
-        // Если следующая сцена есть в Build Settings
-        if (nextSceneIndex < SceneManager.sceneCountInBuildSettings)
+    private void Update()
+    {
+        if (hasFaded) return;
+
+        // Плавное затухание
+        fadeTimer += Time.deltaTime;
+        float alpha = Mathf.Lerp(1f, 0f, fadeTimer / fadeDuration);
+        Color c = sceneText.color;
+        sceneText.color = new Color(c.r, c.g, c.b, alpha);
+
+        if (fadeTimer >= fadeDuration)
         {
-            SceneManager.LoadScene(nextSceneIndex);
-        }
-        else
-        {
-            // Если сцена последняя, можно вернуться на первую
-            SceneManager.LoadScene(0);
+            hasFaded = true;
+
+            int sceneIndex = SceneManager.GetActiveScene().buildIndex;
+            // Мерцание текста для сцен с индексом >= 7
+            if (sceneIndex >= 7 && !hasFlickered)
+            {
+                StartCoroutine(FlickerOnce());
+                hasFlickered = true;
+            }
         }
     }
 
-    private void Awake()
+    private System.Collections.IEnumerator FlickerOnce()
     {
-        // Закрепляем объект выхода
-        Rigidbody2D rb = gameObject.GetComponent<Rigidbody2D>();
-        if (rb == null) rb = gameObject.AddComponent<Rigidbody2D>();
-        rb.bodyType = RigidbodyType2D.Static;
-
-        // Убедимся, что Collider2D триггер
-        BoxCollider2D bc = gameObject.GetComponent<BoxCollider2D>();
-        if (bc != null) bc.isTrigger = true;
+        sceneText.gameObject.SetActive(false);
+        yield return new WaitForSeconds(0.1f);
+        sceneText.gameObject.SetActive(true);
     }
 }
