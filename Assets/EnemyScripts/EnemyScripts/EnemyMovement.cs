@@ -3,25 +3,24 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 public class EnemyMovement : MonoBehaviour
 {
-    public float moveSpeed = 2f;
+    public float speed = 2f;
 
     private Rigidbody2D rb;
-    private Animator animator;
+    private SpriteRenderer sr;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        animator = GetComponent<Animator>();
+        sr = GetComponent<SpriteRenderer>();
     }
 
-    public void Move(Vector2 direction)
+    public void Move(Vector2 dir)
     {
-        rb.velocity = direction * moveSpeed;
-        if (animator != null)
-        {
-            animator.SetFloat("MoveX", direction.x);
-            animator.SetFloat("MoveY", direction.y);
-        }
+        rb.velocity = dir.normalized * speed;
+
+        // поворот спрайта
+        if (dir.x != 0)
+            sr.flipX = dir.x < 0;
     }
 
     public void Stop()

@@ -1,58 +1,28 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Health : MonoBehaviour
 {
+    [SerializeField] private int _healthMax = 100;
     private int _currentHealth;
-    private int _healthMax = 100;
-    private int timer = 0;
 
     public Action OnDeath;
-    public Action <int, int> OnHealthChanges;
+    public Action<int, int> OnHealthChanges;
+
     private void Awake()
     {
         _currentHealth = _healthMax;
-        
-    }
-
-    private void Change()
-    {
-        _currentHealth -= AI.value;
-        if (timer == 2)
-        {
-            StartCoroutine(Wait());
-        }
-        if (_currentHealth > _healthMax)
-        {
-            _currentHealth = _healthMax;
-        }
-        if (_currentHealth <= 0)
-        {
-            OnDeath?.Invoke();
-        }
         OnHealthChanges?.Invoke(_currentHealth, _healthMax);
-        //_OnDeath.Invoke;
     }
 
-    IEnumerator Wait()
+    public void TakeDamage(int damage)
     {
-        while (true)
-        {
-            if (_currentHealth < 85)
-            {
-                Debug.Log("TimerCount: " + (timer++));
-                yield return new WaitForSeconds(1);
-            }
+        _currentHealth -= damage;
+        _currentHealth = Mathf.Clamp(_currentHealth, 0, _healthMax);
 
-            yield return null;
-        }
-    }
+        OnHealthChanges?.Invoke(_currentHealth, _healthMax);
 
-    void Start()
-    {
-        StartCoroutine(Wait());
+        if (_currentHealth <= 0)
+            OnDeath?.Invoke();
     }
 }
-

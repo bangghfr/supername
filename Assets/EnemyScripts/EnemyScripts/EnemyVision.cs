@@ -2,18 +2,33 @@ using UnityEngine;
 
 public class EnemyVision : MonoBehaviour
 {
-    public float visionRange = 6f;
-    public LayerMask playerLayer;
+    public float viewDistance = 6f;
+    public LayerMask targetLayer;
+    public LayerMask obstacleLayer;
 
-    public bool CanSeePlayer(out Transform player)
+    public bool CanSeeTarget(Transform target)
     {
-        Collider2D hit = Physics2D.OverlapCircle(transform.position, visionRange, playerLayer);
-        if (hit != null)
-        {
-            player = hit.transform;
-            return true;
-        }
-        player = null;
-        return false;
+        if (target == null) return false;
+
+        float dist = Vector2.Distance(transform.position, target.position);
+        if (dist > viewDistance) return false;
+
+        RaycastHit2D hit = Physics2D.Linecast(
+            transform.position,
+            target.position,
+            obstacleLayer | targetLayer
+        );
+
+        if (hit.collider == null) return false;
+
+        return ((1 << hit.collider.gameObject.layer) & targetLayer) != 0;
     }
+
+#if UNITY_EDITOR
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, viewDistance);
+    }
+#endif
 }

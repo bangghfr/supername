@@ -1,26 +1,46 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class EnemyManager : MonoBehaviour
+namespace Teaching.Octopus
 {
-    public static EnemyManager Instance;
-    private readonly List<EnemyBase> enemies = new();
-    public EnemyStatsSO stats;
+	public class EnemyManager : MonoBehaviour
+	{
+		[SerializeField] private Transform _parent;
+		
+		[Header("Пример 1. Враги (Simple Enemy Factory)")]
+		[SerializeField] private GameObject _walkerEnemyPrefab;
+		[SerializeField] private GameObject _runnerEnemyPrefab;
+		[SerializeField] private GameObject _flyerEnemyPrefab;
+		
+		[SerializeField] private Transform _flyerSpawnPosition;
 
+		private EnemyPool _enemyPool = null!;
+		private EnemyFactory _enemyFactory = null!;
 
-    private void Awake() 
-    {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
-    }
+		private void Awake()
+		{
+			var parent = _parent != null ? _parent : transform;
 
-    public void Register(EnemyBase enemy)
-    {
-        if (!enemies.Contains(enemy)) enemies.Add(enemy);
-    }
+			_enemyPool = new EnemyPool(parent, new Dictionary<EnemyType, GameObject?>
+			{
+				{ EnemyType.Walker, _walkerEnemyPrefab },
+				{ EnemyType.Runner, _runnerEnemyPrefab },
+				{ EnemyType.Flyer,  _flyerEnemyPrefab }
+			});
 
-    public void Unregister(EnemyBase enemy)
-    {
-        if (enemies.Contains(enemy)) enemies.Remove(enemy);
-    }
+			_enemyFactory = new EnemyFactory(_enemyPool);
+			
+			SpawnEnemy(EnemyType.Flyer, _flyerSpawnPosition.position);
+		}
+
+		public GameObject SpawnEnemy(EnemyType type, Vector3 position)
+		{
+			return _enemyFactory.Create(type, position);
+		}
+
+		public void DespawnEnemy(EnemyType type, GameObject enemy)
+		{
+			_enemyFactory.Release(type, enemy);
+		}
+	}
 }
