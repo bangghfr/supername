@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2661e3ee9c96aa447aca4d914b490f90, type: 3}
   m_Name: FIRSTENEMY
   m_EditorClassIdentifier: 
-  maxHealth: 50
+  maxHealth: 100
   moveSpeed: 2
   attackDamage: 10
   visionRange: 6
