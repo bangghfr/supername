@@ -27,16 +27,19 @@ public class EnemyAI : MonoBehaviour
         float dist = Vector2.Distance(transform.position, target.position);
         Vector2 dir = (target.position - transform.position).normalized;
 
-        if (dist > chaseDistance)
+        if (dist < chaseDistance)
         {
+            Debug.Log("dist < chaseDistance");
             controller.Stop();
         }
         else if (dist > attackDistance)
         {
+            Debug.Log("dist > attackDistance");
             controller.Move(dir);
         }
         else
         {
+            Debug.Log("else");
             controller.Stop();
             controller.Attack();
         }
